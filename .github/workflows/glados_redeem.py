@@ -74,15 +74,17 @@ def redeem_codes(codes):
         print("没有可兑换的码")
         return
     
-    # 配置Chrome选项
-    chrome_options = Options()
-    chrome_options.add_argument('--headless')
-    chrome_options.add_argument('--no-sandbox')
-    chrome_options.add_argument('--disable-dev-shm-usage')
-    chrome_options.add_argument('--disable-gpu')
-    chrome_options.add_argument('--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36')
+    driver = None
     
     try:
+        # 配置Chrome选项
+        chrome_options = Options()
+        chrome_options.add_argument('--headless')
+        chrome_options.add_argument('--no-sandbox')
+        chrome_options.add_argument('--disable-dev-shm-usage')
+        chrome_options.add_argument('--disable-gpu')
+        chrome_options.add_argument('--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36')
+        
         driver = webdriver.Chrome(options=chrome_options)
         driver.implicitly_wait(10)
         
@@ -102,7 +104,10 @@ def redeem_codes(codes):
                 cookie_pair = cookie_pair.strip()
                 if '=' in cookie_pair:
                     key, value = cookie_pair.split('=', 1)
-                    driver.add_cookie({'name': key, 'value': value, 'domain': '.glados.rocks'})
+                    try:
+                        driver.add_cookie({'name': key, 'value': value, 'domain': '.glados.rocks'})
+                    except Exception as e:
+                        print(f"添加cookie失败: {e}")
             # 重新访问兑换页面
             driver.get("https://glados.rocks/console/account")
         
@@ -156,14 +161,16 @@ def redeem_codes(codes):
             except Exception as e:
                 print(f"兑换 {code} 失败: {e}")
                 # 刷新页面重试
-                driver.refresh()
-                time.sleep(5)
+                if driver:
+                    driver.refresh()
+                    time.sleep(5)
     except Exception as e:
         print(f"浏览器操作失败: {e}")
         import traceback
         traceback.print_exc()
     finally:
-        driver.quit()
+        if driver:
+            driver.quit()
 
 def main():
     print("开始执行GLaDOS自动兑换任务")

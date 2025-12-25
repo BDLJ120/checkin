@@ -7,6 +7,7 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.chrome.options import Options
 import time
 import os
+from datetime import datetime
 
 def get_latest_codes():
     url = "https://kerrynotes.com/glados-redeem-code/"
@@ -30,7 +31,7 @@ def get_latest_codes():
         
         if not date_paragraphs:
             print("未找到日期段落")
-            return []
+            return None, []
         
         # 按日期排序，取最新的
         date_paragraphs.sort(key=lambda x: x[0], reverse=True)
@@ -48,7 +49,7 @@ def get_latest_codes():
         
         if not table:
             print("未找到日期对应的表格")
-            return []
+            return latest_date, []
         
         # 提取兑换码
         codes = []
@@ -62,12 +63,12 @@ def get_latest_codes():
                     codes.append(code)
         
         print(f"获取到最新日期 {latest_date} 的兑换码: {codes}")
-        return codes
+        return latest_date, codes
     except Exception as e:
         print(f"获取兑换码失败: {e}")
         import traceback
         traceback.print_exc()
-        return []
+        return None, []
 
 def redeem_codes(codes):
     if not codes:
@@ -273,9 +274,32 @@ def redeem_codes(codes):
 
 def main():
     print("开始执行GLaDOS自动兑换任务")
-    codes = get_latest_codes()
-    redeem_codes(codes)
+    
+    # 获取当前日期，格式为YYYY-MM-DD
+    today = datetime.now().strftime("%Y-%m-%d")
+    print(f"今天的日期: {today}")
+    
+    # 获取最新日期和兑换码
+    latest_date, codes = get_latest_codes()
+    
+    # 检查最新日期是否等于今天日期
+    if latest_date:
+        print(f"最新兑换码日期: {latest_date}")
+        
+        if latest_date == today:
+            print("✅ 最新日期等于今天，开始兑换")
+            redeem_codes(codes)
+            print("任务执行完成")
+            exit(0)  # 成功兑换，返回0退出码
+        else:
+            print("❌ 最新日期不等于今天，跳过兑换")
+            exit(1)  # 跳过兑换，返回非0退出码
+    else:
+        print("❌ 未获取到有效日期，跳过兑换")
+        exit(1)  # 获取日期失败，返回非0退出码
+    
     print("任务执行完成")
+    exit(1)  # 默认返回非0退出码
 
 if __name__ == "__main__":
     main()

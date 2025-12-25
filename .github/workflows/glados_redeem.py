@@ -92,21 +92,47 @@ def redeem_codes(codes):
         
         # 尝试使用不同的方式初始化Chrome
         try:
-            # 方式1：直接使用Chrome
-            driver = webdriver.Chrome(options=chrome_options)
-        except Exception as e:
-            print(f"直接初始化Chrome失败，尝试使用chromedriver路径: {e}")
-            # 方式2：指定chromedriver路径
+            # 方式1：使用Service对象和正确的Chrome二进制路径
+            from selenium.webdriver.chrome.service import Service
             import shutil
-            chromedriver_path = shutil.which('chromedriver')
+            
+            # 查找chromedriver路径
+            chromedriver_path = shutil.which('chromedriver') or shutil.which('chromium-chromedriver')
+            
+            # 查找Chrome/Chromium二进制路径
+            chrome_binary_path = None
+            possible_chrome_paths = [
+                '/usr/bin/chromium-browser',
+                '/usr/bin/chromium',
+                '/usr/bin/google-chrome',
+                '/usr/local/bin/chrome',
+                '/opt/google/chrome/chrome'
+            ]
+            
+            for path in possible_chrome_paths:
+                if shutil.which(path):
+                    chrome_binary_path = path
+                    break
+            
+            if chrome_binary_path:
+                print(f"找到Chrome二进制路径: {chrome_binary_path}")
+                chrome_options.binary_location = chrome_binary_path
+            
             if chromedriver_path:
                 print(f"找到chromedriver路径: {chromedriver_path}")
-                driver = webdriver.Chrome(executable_path=chromedriver_path, options=chrome_options)
+                service = Service(chromedriver_path)
+                driver = webdriver.Chrome(service=service, options=chrome_options)
             else:
-                # 方式3：使用webdriver-manager
+                # 方式2：使用webdriver-manager
                 print("尝试使用webdriver-manager")
                 from webdriver_manager.chrome import ChromeDriverManager
-                driver = webdriver.Chrome(ChromeDriverManager().install(), options=chrome_options)
+                service = Service(ChromeDriverManager().install())
+                driver = webdriver.Chrome(service=service, options=chrome_options)
+        except Exception as e:
+            print(f"Chrome初始化失败: {e}")
+            import traceback
+            traceback.print_exc()
+            return
         driver.implicitly_wait(10)
         
         # 访问兑换页面

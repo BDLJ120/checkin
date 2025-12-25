@@ -77,15 +77,36 @@ def redeem_codes(codes):
     driver = None
     
     try:
-        # 配置Chrome选项
+        # 配置Chrome选项，优化GitHub Actions环境下的运行
         chrome_options = Options()
         chrome_options.add_argument('--headless')
         chrome_options.add_argument('--no-sandbox')
         chrome_options.add_argument('--disable-dev-shm-usage')
         chrome_options.add_argument('--disable-gpu')
+        chrome_options.add_argument('--disable-extensions')
+        chrome_options.add_argument('--disable-popup-blocking')
+        chrome_options.add_argument('--disable-software-rasterizer')
+        chrome_options.add_argument('--window-size=1920,1080')
         chrome_options.add_argument('--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36')
+        chrome_options.add_argument('--remote-debugging-port=9222')
         
-        driver = webdriver.Chrome(options=chrome_options)
+        # 尝试使用不同的方式初始化Chrome
+        try:
+            # 方式1：直接使用Chrome
+            driver = webdriver.Chrome(options=chrome_options)
+        except Exception as e:
+            print(f"直接初始化Chrome失败，尝试使用chromedriver路径: {e}")
+            # 方式2：指定chromedriver路径
+            import shutil
+            chromedriver_path = shutil.which('chromedriver')
+            if chromedriver_path:
+                print(f"找到chromedriver路径: {chromedriver_path}")
+                driver = webdriver.Chrome(executable_path=chromedriver_path, options=chrome_options)
+            else:
+                # 方式3：使用webdriver-manager
+                print("尝试使用webdriver-manager")
+                from webdriver_manager.chrome import ChromeDriverManager
+                driver = webdriver.Chrome(ChromeDriverManager().install(), options=chrome_options)
         driver.implicitly_wait(10)
         
         # 访问兑换页面

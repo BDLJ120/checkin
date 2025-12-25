@@ -1,0 +1,27 @@
+name: GLaDOS Auto Redeem
+
+on:
+  schedule:
+    - cron: '*/5 23-3 * * *'  # 每5分钟运行一次，UTC时间23点-3点（对应北京时间7-12点）
+  workflow_dispatch:
+
+jobs:
+  redeem:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install requests beautifulsoup4 selenium webdriver-manager
+          sudo apt-get update
+          sudo apt-get install -y chromium-browser chromium-chromedriver
+      - name: Run redeem script
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GLADOS_COOKIES: ${{ secrets.GLADOS_COOKIES }}
+        run: python .github/workflows/glados_redeem.py

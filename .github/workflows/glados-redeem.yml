@@ -7,29 +7,8 @@ on:
   workflow_dispatch:
 
 jobs:
-  check-redeem-status:
-    runs-on: ubuntu-latest
-    outputs:
-      should_redeem: ${{ steps.check.outputs.should_redeem }}
-    steps:
-      - name: Check if already redeemed today
-        id: check
-        run: |
-          # 获取当前日期（UTC），转换为北京时间（UTC+8）
-          TODAY=$(date -u -d "+8 hours" +%Y-%m-%d)
-          # 检查是否存在当天的兑换标记
-          if curl -s -o /dev/null -w "%{http_code}" "https://api.github.com/repos/${{ github.repository }}/actions/artifacts?name=redeem-${TODAY}" | grep -q "200"; then
-            echo "should_redeem=false" >> $GITHUB_OUTPUT
-            echo "Already redeemed today, skipping..."
-          else
-            echo "should_redeem=true" >> $GITHUB_OUTPUT
-            echo "Not redeemed today, proceeding..."
-          fi
-
   redeem:
     runs-on: ubuntu-latest
-    needs: check-redeem-status
-    if: ${{ needs.check-redeem-status.outputs.should_redeem == 'true' }}
     steps:
       - uses: actions/checkout@v4
       - name: Set up Python
@@ -47,27 +26,4 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GLADOS_COOKIES: ${{ secrets.GLADOS_COOKIES }}
-        run: python .github/workflows/glados_redeem.py
-      - name: Create redeem marker (only on success)
-        if: ${{ success() }}
-        id: create-marker
-        run: |
-          # 获取当前日期（UTC），转换为北京时间（UTC+8）
-          TODAY=$(date -u -d "+8 hours" +%Y-%m-%d)
-          # 导出TODAY环境变量供后续步骤使用
-          echo "TODAY=$TODAY" >> $GITHUB_ENV
-          # 创建一个空的标记文件
-          touch redeem-${TODAY}.txt
-          echo "Created marker file: redeem-${TODAY}.txt"
-      - name: Upload redeem marker (only on success)
-        if: ${{ success() }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: redeem-${{ env.TODAY }}
-          path: redeem-${{ env.TODAY }}.txt
-          retention-days: 1  # 只保留1天
-      - name: Clean up
-        if: ${{ success() }}
-        run: |
-          rm -f redeem-*.txt
-          echo "Cleaned up marker files"
+        run: python glados_redeem.py

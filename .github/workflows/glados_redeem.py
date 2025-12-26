@@ -131,95 +131,117 @@ def redeem_codes(codes):
         # 开始批量兑换
         print(f"\n=== 开始批量兑换 {len(codes)} 个码 ===")
         
-        # 尝试多个可能的API端点
-        api_endpoints = [
-            'https://glados.rocks/api/user/redeem',
-            'https://glados.rocks/api/user/redeemCode',
-            'https://glados.rocks/api/redeem',
-        ]
+        # 使用正确的API端点（已通过测试确认）
+        successful_endpoint = 'https://glados.rocks/api/user/code'
+        print(f"[成功] 使用API端点: {successful_endpoint}")
         
-        successful_endpoint = None
-        
-        # 先测试第一个端点是否可用
-        for endpoint in api_endpoints:
-            try:
-                # 测试请求（使用第一个码）
-                test_response = session.post(
-                    endpoint,
-                    json={'code': codes[0]},
-                    timeout=10
-                )
-                if test_response.status_code in [200, 201]:
-                    successful_endpoint = endpoint
-                    print(f"[成功] 找到可用的API端点: {endpoint}")
-                    break
-            except Exception as e:
-                print(f"[警告] 测试端点 {endpoint} 失败: {e}")
-                continue
-        
-        if not successful_endpoint:
-            # 如果所有端点都失败，尝试使用第一个端点（可能是参数格式不同）
-            successful_endpoint = api_endpoints[0]
-            print(f"[警告] 无法确定API端点，使用默认端点: {successful_endpoint}")
+        # 初始等待，避免立即触发频率限制
+        print("等待3秒以避免频率限制...")
+        time.sleep(3)
         
         # 批量兑换
         for i, code in enumerate(codes):
             try:
                 print(f"\n[{i+1}/{len(codes)}] 尝试兑换: {code}")
                 
-                # 尝试不同的请求体格式
+                # 使用正确的请求体格式（已通过测试确认）
                 request_bodies = [
-                    {'code': code},
-                    {'redeemCode': code},
-                    {'redeem_code': code},
-                    {'code': code, 'token': 'glados.one'},
+                    {'code': code},  # 标准格式
+                    {'code': code, 'token': 'glados.one'},  # 带token格式
                 ]
                 
                 redeemed = False
+                max_retries = 3  # 最大重试次数
+                retry_count = 0
+                
+                # 使用POST请求，JSON格式（已确认的正确格式）
                 for body in request_bodies:
-                    try:
-                        response = session.post(
-                            successful_endpoint,
-                            json=body,
-                            timeout=15
-                        )
-                        
-                        # 解析响应
+                    if redeemed:
+                        break
+                    
+                    retry_count = 0
+                    while retry_count < max_retries:
                         try:
-                            result = response.json()
-                        except:
-                            result = {'message': response.text[:200]}
-                        
-                        # 检查响应状态
-                        if response.status_code in [200, 201]:
-                            if result.get('code') == 0 or 'success' in str(result).lower():
-                                print(f"  [成功] 兑换成功: {result.get('message', '兑换码已使用')}")
-                                redeemed = True
-                                break
-                            elif result.get('code') == -1 or 'error' in str(result).lower():
-                                error_msg = result.get('message', '未知错误')
-                                print(f"  [失败] 兑换失败: {error_msg}")
-                                # 如果是已使用或无效的码，继续下一个
-                                if 'already' in error_msg.lower() or 'used' in error_msg.lower() or 'invalid' in error_msg.lower():
-                                    redeemed = True  # 标记为已处理，不再尝试其他格式
+                            response = session.post(
+                                successful_endpoint,
+                                json=body,
+                                timeout=15
+                            )
+                            
+                            # 解析响应
+                            try:
+                                result = response.json()
+                            except:
+                                result = {'message': response.text[:200]}
+                            
+                            # 检查响应状态（API返回格式: {'code': 0或1或-2, 'message': '...'}）
+                            if response.status_code == 200:
+                                api_code = result.get('code')
+                                api_message = result.get('message', '')
+                                
+                                if api_code == 0:
+                                    # code=0 表示成功
+                                    print(f"  [成功] 兑换成功: {api_message}")
+                                    redeemed = True
+                                    break
+                                elif api_code == -2:
+                                    # code=-2 表示已使用的兑换码
+                                    print(f"  [信息] 兑换码已使用: {api_message}")
+                                    redeemed = True  # 标记为已处理
+                                    break
+                                elif api_code == 1:
+                                    # code=1 表示失败（如找不到码）
+                                    error_msg = api_message
+                                    print(f"  [失败] 兑换失败: {error_msg}")
+                                    # 如果是已使用或无效的码，标记为已处理
+                                    if 'already' in error_msg.lower() or 'used' in error_msg.lower() or 'invalid' in error_msg.lower() or 'can not find' in error_msg.lower():
+                                        redeemed = True  # 标记为已处理，不再尝试其他格式
+                                    break
+                                else:
+                                    print(f"  [信息] 响应: {result}")
+                                    redeemed = True  # 未知状态码，标记为已处理
+                                    break
+                            elif response.status_code == 429:
+                                # 429表示请求过于频繁，需要等待更长时间
+                                retry_count += 1
+                                wait_time = 10 * retry_count  # 递增等待时间
+                                print(f"  [警告] 请求过于频繁（{retry_count}/{max_retries}），等待{wait_time}秒后重试...")
+                                time.sleep(wait_time)
+                                # 继续重试
+                                continue
+                            elif response.status_code == 404:
+                                # 404说明端点不对，跳过
+                                print(f"  [错误] API端点不存在")
                                 break
                             else:
-                                print(f"  [信息] 响应: {result}")
-                        else:
-                            print(f"  [警告] HTTP状态码: {response.status_code}, 响应: {result}")
-                            
-                    except requests.exceptions.Timeout:
-                        print(f"  [错误] 请求超时")
-                        continue
-                    except Exception as e:
-                        print(f"  [错误] 请求失败: {e}")
-                        continue
+                                print(f"  [警告] HTTP状态码: {response.status_code}, 响应: {result}")
+                                break
+                                
+                        except requests.exceptions.Timeout:
+                            retry_count += 1
+                            if retry_count < max_retries:
+                                print(f"  [错误] 请求超时（{retry_count}/{max_retries}），等待5秒后重试...")
+                                time.sleep(5)
+                                continue
+                            else:
+                                print(f"  [错误] 请求超时，已达到最大重试次数")
+                                break
+                        except Exception as e:
+                            print(f"  [错误] 请求失败: {e}")
+                            break
+                    
+                    if redeemed:
+                        break
                 
                 if not redeemed:
                     print(f"  [警告] 所有请求格式都失败，跳过此码")
                 
-                # 避免请求过快
-                time.sleep(2)
+                # 避免请求过快（增加延迟以避免429错误）
+                # 如果遇到429错误，等待更长时间
+                if i < len(codes) - 1:  # 不是最后一个码
+                    wait_time = 5
+                    print(f"  等待{wait_time}秒后继续下一个码...")
+                    time.sleep(wait_time)
                 
             except Exception as e:
                 print(f"[错误] 兑换 {code} 失败: {e}")

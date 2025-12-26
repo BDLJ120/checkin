@@ -1,3 +1,11 @@
+# -*- coding: utf-8 -*-
+import sys
+import io
+# 设置标准输出为UTF-8编码（Windows兼容）
+if sys.platform == 'win32':
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
+
 import requests
 from bs4 import BeautifulSoup
 from selenium import webdriver
@@ -173,83 +181,126 @@ def redeem_codes(codes):
             driver.save_screenshot("account_page.png")
             with open("account_page.html", "w", encoding="utf-8") as f:
                 f.write(driver.page_source)
-            print("✅ 已保存账户页面截图和HTML源码用于调试")
+            print("[成功] 已保存账户页面截图和HTML源码用于调试")
         except Exception as e:
-            print(f"⚠️  保存调试信息失败: {e}")
+            print(f"[警告] 保存调试信息失败: {e}")
         
         # 检查是否已登录
         if "login" in driver.current_url.lower():
             print("未登录，请检查GLADOS_COOKIES是否正确")
             return
         
-        # 尝试多种方式定位并点击"输入兑换码"按钮
-        print("\n查找并点击'输入兑换码'按钮...")
-        button_clicked = False
-        
-        # 策略1: 尝试多种XPath选择器
-        button_selectors = [
-            "//a[contains(text(), '输入兑换码')]",
-            "//a[contains(text(), '兑换码')]",
-            "//button[contains(text(), '输入兑换码')]",
-            "//button[contains(text(), '兑换码')]",
-            "//*[contains(text(), '输入兑换码')]",
-            "//a[@href='/console/code']",
-            "//a[@href='console/code']",
-            "//a[contains(@href, 'code')]",
-        ]
-        
-        for selector in button_selectors:
-            try:
-                print(f"  尝试选择器: {selector}")
-                # 先等待元素出现
-                element = wait.until(EC.presence_of_element_located((By.XPATH, selector)))
-                print(f"  ✅ 找到元素: {element.tag_name}, 文本: {element.text[:50] if element.text else 'N/A'}")
-                
-                # 滚动到元素位置
-                driver.execute_script("arguments[0].scrollIntoView({behavior: 'smooth', block: 'center'});", element)
-                time.sleep(1)
-                
-                # 尝试点击
-                try:
-                    element.click()
-                    print(f"  ✅ 使用普通点击成功")
-                    button_clicked = True
-                    break
-                except:
-                    # 如果普通点击失败，尝试JavaScript点击
-                    print(f"  普通点击失败，尝试JavaScript点击...")
-                    driver.execute_script("arguments[0].click();", element)
-                    print(f"  ✅ 使用JavaScript点击成功")
-                    button_clicked = True
-                    break
-            except Exception as e:
-                print(f"  ❌ 选择器失败: {str(e)[:100]}")
-                continue
-        
-        if not button_clicked:
-            print("❌ 所有按钮定位策略都失败")
-            # 打印页面上所有链接和按钮用于调试
-            try:
-                print("\n=== 页面调试信息 ===")
-                print("所有链接:")
-                links = driver.find_elements(By.TAG_NAME, "a")
-                for i, link in enumerate(links[:20]):  # 只显示前20个
-                    href = link.get_attribute("href") or "N/A"
-                    text = link.text.strip() or "N/A"
-                    print(f"  [{i+1}] 文本: {text[:50]}, href: {href[:80]}")
-                
-                print("\n所有按钮:")
-                buttons = driver.find_elements(By.TAG_NAME, "button")
-                for i, btn in enumerate(buttons[:20]):  # 只显示前20个
-                    text = btn.text.strip() or "N/A"
-                    btn_type = btn.get_attribute("type") or "N/A"
-                    print(f"  [{i+1}] 文本: {text[:50]}, type: {btn_type}")
-            except Exception as e:
-                print(f"⚠️  获取调试信息失败: {e}")
-            
-            print("\n尝试直接访问兑换码页面...")
+        # 策略：优先尝试直接访问兑换码页面（最可靠），如果失败再尝试点击按钮
+        print("\n尝试访问兑换码页面...")
+        try:
             driver.get("https://glados.rocks/console/code")
             time.sleep(5)
+            
+            # 验证是否成功到达兑换码页面
+            current_url = driver.current_url
+            if "code" in current_url.lower() or "console" in current_url.lower():
+                print("[成功] 直接访问兑换码页面成功")
+                button_clicked = True
+            else:
+                print(f"[警告] 可能未成功跳转，当前URL: {current_url}")
+                button_clicked = False
+        except Exception as e:
+            print(f"[错误] 直接访问失败: {e}")
+            button_clicked = False
+        
+        # 如果直接访问失败，尝试查找并点击按钮
+        if not button_clicked:
+            print("\n尝试查找并点击'输入兑换码'按钮...")
+            
+            # 策略1: 尝试多种XPath选择器（包括中英文）
+            button_selectors = [
+                # href属性匹配（最可靠）
+                "//a[@href='/console/code']",
+                "//a[contains(@href, '/console/code')]",
+                "//a[contains(@href, 'code')]",
+                # 中文文本匹配
+                "//a[contains(text(), '输入兑换码')]",
+                "//a[contains(text(), '兑换码')]",
+                "//a[contains(text(), '兑换')]",
+                "//button[contains(text(), '输入兑换码')]",
+                "//button[contains(text(), '兑换码')]",
+                "//*[contains(text(), '输入兑换码')]",
+                # 英文文本匹配
+                "//a[contains(text(), 'Redeem')]",
+                "//a[contains(text(), 'Code')]",
+                "//button[contains(text(), 'Redeem')]",
+                # 导航栏中的链接
+                "//nav//a[contains(@href, 'code')]",
+                "//nav//a[contains(text(), '兑换')]",
+            ]
+            
+            for selector in button_selectors:
+                try:
+                    print(f"  尝试选择器: {selector}")
+                    # 先等待元素出现（缩短等待时间）
+                    element = WebDriverWait(driver, 5).until(
+                        EC.presence_of_element_located((By.XPATH, selector))
+                    )
+                    print(f"  [成功] 找到元素: {element.tag_name}, 文本: {element.text[:50] if element.text else 'N/A'}")
+                    
+                    # 检查元素是否可见和可点击
+                    if not element.is_displayed():
+                        print(f"  [警告] 元素不可见，尝试滚动...")
+                        driver.execute_script("arguments[0].scrollIntoView({behavior: 'smooth', block: 'center'});", element)
+                        time.sleep(1)
+                    
+                    # 尝试点击
+                    try:
+                        element.click()
+                        print(f"  [成功] 使用普通点击成功")
+                        button_clicked = True
+                        time.sleep(3)
+                        break
+                    except:
+                        # 如果普通点击失败，尝试JavaScript点击
+                        print(f"  普通点击失败，尝试JavaScript点击...")
+                        driver.execute_script("arguments[0].click();", element)
+                        print(f"  [成功] 使用JavaScript点击成功")
+                        button_clicked = True
+                        time.sleep(3)
+                        break
+                except Exception as e:
+                    print(f"  [错误] 选择器失败: {str(e)[:100]}")
+                    continue
+            
+            if not button_clicked:
+                print("[错误] 所有按钮定位策略都失败")
+                # 打印页面上所有链接和按钮用于调试
+                try:
+                    print("\n=== 页面调试信息 ===")
+                    print("所有链接（前20个）:")
+                    links = driver.find_elements(By.TAG_NAME, "a")
+                    for i, link in enumerate(links[:20]):
+                        try:
+                            href = link.get_attribute("href") or "N/A"
+                            text = link.text.strip() or "N/A"
+                            if href != "N/A" or text != "N/A":
+                                print(f"  [{i+1}] 文本: {text[:50]}, href: {href[:80]}")
+                        except:
+                            pass
+                    
+                    print("\n所有按钮（前20个）:")
+                    buttons = driver.find_elements(By.TAG_NAME, "button")
+                    for i, btn in enumerate(buttons[:20]):
+                        try:
+                            text = btn.text.strip() or "N/A"
+                            btn_type = btn.get_attribute("type") or "N/A"
+                            if text != "N/A" or btn_type != "N/A":
+                                print(f"  [{i+1}] 文本: {text[:50]}, type: {btn_type}")
+                        except:
+                            pass
+                except Exception as e:
+                    print(f"[警告] 获取调试信息失败: {e}")
+                
+                # 最后尝试：再次直接访问
+                print("\n最后尝试：再次直接访问兑换码页面...")
+                driver.get("https://glados.rocks/console/code")
+                time.sleep(5)
         
         # 等待页面加载完成
         time.sleep(5)
@@ -263,12 +314,12 @@ def redeem_codes(codes):
             driver.save_screenshot("code_page.png")
             with open("code_page.html", "w", encoding="utf-8") as f:
                 f.write(driver.page_source)
-            print("✅ 已保存兑换码页面截图和HTML源码用于调试")
+            print("[成功] 已保存兑换码页面截图和HTML源码用于调试")
         except Exception as e:
-            print(f"⚠️  保存调试信息失败: {e}")
+            print(f"[警告] 保存调试信息失败: {e}")
         
         if "code" not in current_url.lower():
-            print("⚠️  可能未成功跳转到兑换码页面，尝试再次访问...")
+            print("[警告] 可能未成功跳转到兑换码页面，尝试再次访问...")
             driver.get("https://glados.rocks/console/code")
             time.sleep(5)
         
@@ -289,14 +340,14 @@ def redeem_codes(codes):
             try:
                 print(f"  尝试定位输入框: {by}={selector}")
                 code_input = wait.until(EC.presence_of_element_located((by, selector)))
-                print(f"  ✅ 找到兑换码输入框: {by}={selector}")
+                print(f"  [成功] 找到兑换码输入框: {by}={selector}")
                 break
             except Exception as e:
-                print(f"  ❌ 输入框定位失败: {str(e)[:100]}")
+                print(f"  [错误] 输入框定位失败: {str(e)[:100]}")
                 continue
         
         if not code_input:
-            print("❌ 无法定位兑换码输入框")
+            print("[错误] 无法定位兑换码输入框")
             raise Exception("无法定位兑换码输入框")
         
         # 等待并定位兑换按钮 - 尝试多种方式
@@ -314,16 +365,16 @@ def redeem_codes(codes):
                 print(f"  尝试定位兑换按钮: {by}={selector}")
                 redeem_button = wait.until(EC.element_to_be_clickable((by, selector)))
                 button_text = redeem_button.text.strip() if redeem_button.text else ""
-                print(f"  ✅ 找到兑换按钮: {by}={selector}, 文本: {button_text}")
+                print(f"  [成功] 找到兑换按钮: {by}={selector}, 文本: {button_text}")
                 # 验证按钮文本是否包含"兑换"
                 if "兑换" in button_text or not button_text:
                     break
             except Exception as e:
-                print(f"  ❌ 兑换按钮定位失败: {str(e)[:100]}")
+                print(f"  [错误] 兑换按钮定位失败: {str(e)[:100]}")
                 continue
         
         if not redeem_button:
-            print("❌ 无法定位兑换按钮")
+            print("[错误] 无法定位兑换按钮")
             raise Exception("无法定位兑换按钮")
         
         # 开始批量兑换
@@ -414,15 +465,15 @@ def redeem_codes(codes):
                 
                 # 打印结果
                 if success_message:
-                    print(f"✅ 兑换 {code} 成功: {success_message}")
+                    print(f"[成功] 兑换 {code} 成功: {success_message}")
                 else:
-                    print(f"✅ 兑换 {code} 完成")
+                    print(f"[成功] 兑换 {code} 完成")
                 
                 # 等待一段时间，确保页面稳定
                 time.sleep(3)
                 
             except Exception as e:
-                print(f"❌ 兑换 {code} 失败: {e}")
+                print(f"[错误] 兑换 {code} 失败: {e}")
                 time.sleep(5)  # 失败时等待更长时间
     
     except Exception as e:
@@ -446,15 +497,15 @@ def main():
         print(f"最新兑换码日期: {latest_date}")
         
         if latest_date == today:
-            print("✅ 最新日期等于今天，开始兑换")
+            print("[成功] 最新日期等于今天，开始兑换")
             redeem_codes(codes)
             print("任务执行完成")
             exit(0)  # 成功兑换，返回0退出码
         else:
-            print("❌ 最新日期不等于今天，跳过兑换")
+            print("[错误] 最新日期不等于今天，跳过兑换")
             exit(1)  # 跳过兑换，返回非0退出码
     else:
-        print("❌ 未获取到有效日期，跳过兑换")
+        print("[错误] 未获取到有效日期，跳过兑换")
         exit(1)  # 获取日期失败，返回非0退出码
     
     print("任务执行完成")

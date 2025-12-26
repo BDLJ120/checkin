@@ -18,12 +18,10 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install requests beautifulsoup4 selenium webdriver-manager
-          sudo apt-get update
-          sudo apt-get install -y chromium-browser chromium-chromedriver
+          pip install -r requirements.txt
       - name: Run redeem script
         id: run-redeem
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GLADOS_COOKIES: ${{ secrets.GLADOS_COOKIES }}
-        run: python .github/workflows/glados_redeem.py
+        run: python glados_redeem.py

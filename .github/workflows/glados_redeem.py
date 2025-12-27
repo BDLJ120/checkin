@@ -253,6 +253,12 @@ def redeem_codes(codes):
         traceback.print_exc()
 
 def main():
+    # 解析命令行参数
+    import argparse
+    parser = argparse.ArgumentParser(description='GLaDOS自动兑换码脚本')
+    parser.add_argument('-f', '--force', action='store_true', help='强制兑换所有获取到的码，不管日期是否匹配')
+    args = parser.parse_args()
+    
     print("开始执行GLaDOS自动兑换任务")
     
     # 获取当前日期，格式为YYYY-MM-DD
@@ -266,20 +272,23 @@ def main():
     if latest_date:
         print(f"最新兑换码日期: {latest_date}")
         
-        if latest_date == today:
-            print("[成功] 最新日期等于今天，开始兑换")
+        if latest_date == today or args.force:
+            if args.force and latest_date != today:
+                print("[信息] 强制模式，开始兑换非今日的码")
+            else:
+                print("[成功] 最新日期等于今天，开始兑换")
             redeem_codes(codes)
             print("任务执行完成")
             exit(0)  # 成功兑换，返回0退出码
         else:
-            print("[错误] 最新日期不等于今天，跳过兑换")
-            exit(1)  # 跳过兑换，返回非0退出码
+            print("[信息] 最新日期不等于今天，跳过兑换")
+            exit(0)  # 跳过兑换，但返回成功退出码，因为脚本执行正常
     else:
         print("[错误] 未获取到有效日期，跳过兑换")
         exit(1)  # 获取日期失败，返回非0退出码
     
     print("任务执行完成")
-    exit(1)  # 默认返回非0退出码
+    exit(0)  # 默认返回成功退出码
 
 if __name__ == "__main__":
     main()

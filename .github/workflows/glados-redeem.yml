@@ -1,23 +1,27 @@
+
+    #- cron: '*/5 23 * * *'  # 每5分钟运行一次，UTC时间23点（对应北京时间7点）
+    #- cron: '*/5 0-3 * * *'  # 每5分钟运行一次，UTC时间0-3点（对应北京时间8-12点）
+    #- cron: '*/5 23,0-2 * * *'  # 每5分钟运行一次，UTC时间0-3点（对应北京时间8-12点）
+    #- cron: '30,35,40,45,50,55 3 * * *'
 name: GLaDOS Auto Redeem
 
 on:
   schedule:
-    #- cron: '*/5 23 * * *'  # 每5分钟运行一次，UTC时间23点（对应北京时间7点）
-    #- cron: '*/5 0-3 * * *'  # 每5分钟运行一次，UTC时间0-3点（对应北京时间8-12点）
-    #- cron: '*/5 23,0-2 * * *'  # 每5分钟运行一次，UTC时间0-3点（对应北京时间8-12点）
+    # 覆盖UTC 3点30/35/40/45/50/55分 → 北京时间11:30-11:55（每5分钟）
     - cron: '30,35,40,45,50,55 3 * * *'
-  workflow_dispatch:
+  workflow_dispatch:  # 保留手动触发，方便测试
 
 jobs:
   redeem:
     runs-on: ubuntu-latest
+    # 声明北京时间，日志时间更直观
     env:
-      TZ: Asia/Shanghai     
+      TZ: Asia/Shanghai
     steps:
-      #- uses: actions/checkout@v4actions/checkout@v4
+      # 修复之前重复的语法错误
       - uses: actions/checkout@v4
       - name: Set up Python
-        uses: actions/setup-python@v5actions/setup-python@v5actions/setup-python@v5actions/setup-python@v5
+        uses: actions/setup-python@v5
         with:
           python-version: '3.10'
       - name: Install dependencies

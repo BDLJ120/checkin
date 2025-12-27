@@ -7,13 +7,13 @@ name: GLaDOS Auto Redeem
 
 on:
   schedule:
-    # 覆盖UTC 3点30/35/40/45/50/55分 → 北京时间11:30-11:55（每5分钟）
-    - cron: '30,35,40,45,50,55 3 * * *'
+    #北京时间 7 点到 11 点每半小时运行一次，
+    - cron: '0,30 23,0-2 * * *'
   workflow_dispatch:  # 保留手动触发，方便测试
 
 jobs:
   redeem:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-latestubuntu-latest
     # 声明北京时间，日志时间更直观
     env:
       TZ: Asia/Shanghai
@@ -29,7 +29,7 @@ jobs:
           python -m pip install --upgrade pip
           pip install requests beautifulsoup4
       - name: Run redeem script
-        id: run-redeem
+        id: run-redeemrun-redeem
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GLADOS_COOKIES: ${{ secrets.GLADOS_COOKIES }}

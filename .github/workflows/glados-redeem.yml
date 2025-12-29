@@ -8,7 +8,7 @@ name: GLaDOS Auto Redeem
 on:
   schedule:
     #北京时间 7 点到 11 点每半小时运行一次，
-    - cron: '0,30 23,0-2 * * *'
+    - cron: '0,30 0-2 * * *'
   workflow_dispatch:  # 保留手动触发，方便测试
 
 jobs:

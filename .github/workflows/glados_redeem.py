@@ -26,12 +26,58 @@ def get_latest_codes():
         
         for p in paragraphs:
             text = p.get_text(strip=True)
-            if text and len(text) >= 10:
-                # 检查是否为日期格式，如 2025-12-23:
-                if text[-1] == ':' and text.count('-') == 2:
-                    date_text = text[:-1].strip()  # 去除冒号
-                    if len(date_text) == 10:
-                        date_paragraphs.append((date_text, p))
+            if text and len(text) >= 8:
+                # 支持多种日期格式
+                # 格式1: 2025-12-23: 或 2026-1-6: (带冒号)
+                # 格式2: 2025-12-23, 或 2026-1-6, (带逗号)
+                # 格式3: 2025/12/23 或 2026/1/6 (使用斜杠)
+                # 格式4: 2025.12.23 或 2026.1.6 (使用点号)
+                # 格式5: 2025年12月23日 或 2026年1月6日 (中文格式)
+                
+                date_text = None
+                separator = None
+                
+                # 检查是否以冒号或逗号结尾
+                if text[-1] in [':', ',']:
+                    potential_date = text[:-1].strip()
+                else:
+                    potential_date = text
+                
+                # 尝试不同的分隔符
+                if '-' in potential_date and potential_date.count('-') == 2:
+                    separator = '-'
+                elif '/' in potential_date and potential_date.count('/') == 2:
+                    separator = '/'
+                elif '.' in potential_date and potential_date.count('.') == 2:
+                    separator = '.'
+                elif '年' in potential_date and '月' in potential_date and '日' in potential_date:
+                    # 中文格式: 2026年1月6日
+                    try:
+                        year = int(potential_date.split('年')[0])
+                        month = int(potential_date.split('月')[0].split('年')[1])
+                        day = int(potential_date.split('日')[0].split('月')[1])
+                        dt = datetime(year, month, day)
+                        formatted_date = dt.strftime("%Y-%m-%d")
+                        date_paragraphs.append((formatted_date, p))
+                        continue
+                    except (ValueError, IndexError):
+                        continue
+                
+                if separator:
+                    try:
+                        parts = potential_date.split(separator)
+                        if len(parts) == 3:
+                            year = int(parts[0])
+                            month = int(parts[1])
+                            day = int(parts[2])
+                            # 创建日期对象
+                            dt = datetime(year, month, day)
+                            # 转换为标准格式 YYYY-MM-DD
+                            formatted_date = dt.strftime("%Y-%m-%d")
+                            date_paragraphs.append((formatted_date, p))
+                    except (ValueError, IndexError):
+                        # 不是有效日期，跳过
+                        continue
         
         if not date_paragraphs:
             print("未找到日期段落")

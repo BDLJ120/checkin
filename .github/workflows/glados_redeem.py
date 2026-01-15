@@ -1,6 +1,8 @@
+# 请将您的代码复制到这里
 # -*- coding: utf-8 -*-
 import sys
 import io
+import re
 # 设置标准输出为UTF-8编码（Windows兼容）
 if sys.platform == 'win32':
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
@@ -26,57 +28,21 @@ def get_latest_codes():
         
         for p in paragraphs:
             text = p.get_text(strip=True)
-            if text and len(text) >= 8:
-                # 支持多种日期格式
-                # 格式1: 2025-12-23: 或 2026-1-6: (带冒号)
-                # 格式2: 2025-12-23, 或 2026-1-6, (带逗号)
-                # 格式3: 2025/12/23 或 2026/1/6 (使用斜杠)
-                # 格式4: 2025.12.23 或 2026.1.6 (使用点号)
-                # 格式5: 2025年12月23日 或 2026年1月6日 (中文格式)
-                
-                date_text = None
-                separator = None
-                
-                # 检查是否以冒号或逗号结尾
-                if text[-1] in [':', ',']:
-                    potential_date = text[:-1].strip()
-                else:
-                    potential_date = text
-                
-                # 尝试不同的分隔符
-                if '-' in potential_date and potential_date.count('-') == 2:
-                    separator = '-'
-                elif '/' in potential_date and potential_date.count('/') == 2:
-                    separator = '/'
-                elif '.' in potential_date and potential_date.count('.') == 2:
-                    separator = '.'
-                elif '年' in potential_date and '月' in potential_date and '日' in potential_date:
-                    # 中文格式: 2026年1月6日
+            if text and len(text) >= 8:  # 缩短最小长度要求
+                # 检查是否包含日期格式，支持如 2025-12-23:、2026-1-1,、2026-1-15：等格式
+                # 使用正则表达式匹配日期格式，支持 YYYY-MM-DD 或 YYYY-M-D
+                date_match = re.search(r'\b(20\d{2})-(0?[1-9]|1[0-2])-(0?[1-9]|[12]\d|3[01])(?:[:，,]|$)', text)
+                if date_match:
+                    date_text = date_match.group(0)[:-1].strip()  # 去除结尾的标点符号
+                    # 标准化日期格式为 YYYY-MM-DD
                     try:
-                        year = int(potential_date.split('年')[0])
-                        month = int(potential_date.split('月')[0].split('年')[1])
-                        day = int(potential_date.split('日')[0].split('月')[1])
-                        dt = datetime(year, month, day)
-                        formatted_date = dt.strftime("%Y-%m-%d")
-                        date_paragraphs.append((formatted_date, p))
-                        continue
-                    except (ValueError, IndexError):
-                        continue
-                
-                if separator:
-                    try:
-                        parts = potential_date.split(separator)
-                        if len(parts) == 3:
-                            year = int(parts[0])
-                            month = int(parts[1])
-                            day = int(parts[2])
-                            # 创建日期对象
-                            dt = datetime(year, month, day)
-                            # 转换为标准格式 YYYY-MM-DD
-                            formatted_date = dt.strftime("%Y-%m-%d")
-                            date_paragraphs.append((formatted_date, p))
-                    except (ValueError, IndexError):
-                        # 不是有效日期，跳过
+                        # 解析日期，支持 YYYY-MM-DD 和 YYYY-M-D 格式
+                        dt = datetime.strptime(date_text, '%Y-%m-%d')
+                        # 转换为标准格式 YYYY-MM-DD
+                        standardized_date = dt.strftime('%Y-%m-%d')
+                        date_paragraphs.append((standardized_date, p))
+                    except ValueError:
+                        # 如果解析失败，跳过此日期
                         continue
         
         if not date_paragraphs:
@@ -299,12 +265,6 @@ def redeem_codes(codes):
         traceback.print_exc()
 
 def main():
-    # 解析命令行参数
-    import argparse
-    parser = argparse.ArgumentParser(description='GLaDOS自动兑换码脚本')
-    parser.add_argument('-f', '--force', action='store_true', help='强制兑换所有获取到的码，不管日期是否匹配')
-    args = parser.parse_args()
-    
     print("开始执行GLaDOS自动兑换任务")
     
     # 获取当前日期，格式为YYYY-MM-DD
@@ -318,23 +278,21 @@ def main():
     if latest_date:
         print(f"最新兑换码日期: {latest_date}")
         
-        if latest_date == today or args.force:
-            if args.force and latest_date != today:
-                print("[信息] 强制模式，开始兑换非今日的码")
-            else:
-                print("[成功] 最新日期等于今天，开始兑换")
+        if latest_date == today:
+            print("[成功] 最新日期等于今天，开始兑换")
             redeem_codes(codes)
             print("任务执行完成")
             exit(0)  # 成功兑换，返回0退出码
         else:
-            print("[信息] 最新日期不等于今天，跳过兑换")
-            exit(0)  # 跳过兑换，但返回成功退出码，因为脚本执行正常
+            print("[错误] 最新日期不等于今天，跳过兑换")
+            exit(1)  # 跳过兑换，返回非0退出码
     else:
         print("[错误] 未获取到有效日期，跳过兑换")
         exit(1)  # 获取日期失败，返回非0退出码
     
     print("任务执行完成")
-    exit(0)  # 默认返回成功退出码
+    exit(1)  # 默认返回非0退出码
 
 if __name__ == "__main__":
     main()
+

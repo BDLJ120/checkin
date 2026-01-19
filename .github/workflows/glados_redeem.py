@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import sys
 import io
+import re
 # 设置标准输出为UTF-8编码（Windows兼容）
 if sys.platform == 'win32':
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
@@ -26,12 +27,28 @@ def get_latest_codes():
         
         for p in paragraphs:
             text = p.get_text(strip=True)
-            if text and len(text) >= 10:
-                # 检查是否为日期格式，如 2025-12-23:
-                if text[-1] == ':' and text.count('-') == 2:
-                    date_text = text[:-1].strip()  # 去除冒号
-                    if len(date_text) == 10:
-                        date_paragraphs.append((date_text, p))
+            if text and len(text) >= 8:  # 缩短最小长度要求
+                # 检查是否包含日期格式，支持多种格式：
+                # 如 2025-12-23:、2026-1-1,、2026-1-15：、2026-1-15，官方现在好像送7天，登录就能看到：
+                # 使用正则表达式匹配日期格式，支持 YYYY-MM-DD 或 YYYY-M-D，忽略前后空格，支持中英文符号
+                date_match = re.search(r'\s*(20\d{2})-(0?[1-9]|1[0-2])-(0?[1-9]|[12]\d|3[01])\s*(?:[:，,。！？；；：]|$|\s)', text)
+                if date_match:
+                    # 只提取日期部分（年、月、日），不包含标点符号
+                    year = date_match.group(1)
+                    month = date_match.group(2)
+                    day = date_match.group(3)
+                    # 组合成日期字符串
+                    date_text = f"{year}-{month}-{day}"
+                    # 标准化日期格式为 YYYY-MM-DD
+                    try:
+                        # 解析日期，支持 YYYY-MM-DD 和 YYYY-M-D 格式
+                        dt = datetime.strptime(date_text, '%Y-%m-%d')
+                        # 转换为标准格式 YYYY-MM-DD
+                        standardized_date = dt.strftime('%Y-%m-%d')
+                        date_paragraphs.append((standardized_date, p))
+                    except ValueError:
+                        # 如果解析失败，跳过此日期
+                        continue
         
         if not date_paragraphs:
             print("未找到日期段落")

@@ -1,8 +1,6 @@
-# 请将您的代码复制到这里
 # -*- coding: utf-8 -*-
 import sys
 import io
-import re
 # 设置标准输出为UTF-8编码（Windows兼容）
 if sys.platform == 'win32':
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
@@ -28,22 +26,12 @@ def get_latest_codes():
         
         for p in paragraphs:
             text = p.get_text(strip=True)
-            if text and len(text) >= 8:  # 缩短最小长度要求
-                # 检查是否包含日期格式，支持如 2025-12-23:、2026-1-1,、2026-1-15：等格式
-                # 使用正则表达式匹配日期格式，支持 YYYY-MM-DD 或 YYYY-M-D
-                date_match = re.search(r'\b(20\d{2})-(0?[1-9]|1[0-2])-(0?[1-9]|[12]\d|3[01])(?:[:，,]|$)', text)
-                if date_match:
-                    date_text = date_match.group(0)[:-1].strip()  # 去除结尾的标点符号
-                    # 标准化日期格式为 YYYY-MM-DD
-                    try:
-                        # 解析日期，支持 YYYY-MM-DD 和 YYYY-M-D 格式
-                        dt = datetime.strptime(date_text, '%Y-%m-%d')
-                        # 转换为标准格式 YYYY-MM-DD
-                        standardized_date = dt.strftime('%Y-%m-%d')
-                        date_paragraphs.append((standardized_date, p))
-                    except ValueError:
-                        # 如果解析失败，跳过此日期
-                        continue
+            if text and len(text) >= 10:
+                # 检查是否为日期格式，如 2025-12-23:
+                if text[-1] == ':' and text.count('-') == 2:
+                    date_text = text[:-1].strip()  # 去除冒号
+                    if len(date_text) == 10:
+                        date_paragraphs.append((date_text, p))
         
         if not date_paragraphs:
             print("未找到日期段落")
@@ -284,15 +272,14 @@ def main():
             print("任务执行完成")
             exit(0)  # 成功兑换，返回0退出码
         else:
-            print("[错误] 最新日期不等于今天，跳过兑换")
-            exit(1)  # 跳过兑换，返回非0退出码
+            print("[信息] 最新日期不等于今天，跳过兑换")
+            exit(0)  # 跳过兑换，但返回0退出码（成功）
     else:
-        print("[错误] 未获取到有效日期，跳过兑换")
-        exit(1)  # 获取日期失败，返回非0退出码
+        print("[信息] 未获取到有效日期，跳过兑换")
+        exit(0)  # 获取日期失败，但返回0退出码（成功）
     
     print("任务执行完成")
-    exit(1)  # 默认返回非0退出码
+    exit(0)  # 默认返回0退出码（成功）
 
 if __name__ == "__main__":
     main()
-

@@ -4,15 +4,18 @@ const glados = async () => {
   try {
     const headers = {
       'cookie': cookie,
-      'referer': 'https://glados.rocks/console/checkin',
+      // 1. 修改 referer 为新域名
+      'referer': 'https://glados.cloud/console/checkin',
       'user-agent': 'Mozilla/4.0 (compatible; MSIE 7.0; Windows NT 6.0)',
     }
-    const checkin = await fetch('https://glados.rocks/api/user/checkin', {
+    // 2. 修改签到接口地址为新域名
+    const checkin = await fetch('https://glados.cloud/api/user/checkin', {
       method: 'POST',
       headers: { ...headers, 'content-type': 'application/json' },
       body: '{"token":"glados.one"}',
     }).then((r) => r.json())
-    const status = await fetch('https://glados.rocks/api/user/status', {
+    // 3. 修改状态查询接口地址为新域名
+    const status = await fetch('https://glados.cloud/api/user/status', {
       method: 'GET',
       headers,
     }).then((r) => r.json())
